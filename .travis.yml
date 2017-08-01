@@ -4,3 +4,7 @@ language: java
 
 services:
   - docker
+
+branches:
+  only:
+  - test-container
