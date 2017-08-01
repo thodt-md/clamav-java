@@ -1,6 +1,7 @@
 package fi.solita.clamav;
 
 import java.io.*;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -11,31 +12,44 @@ import java.util.Arrays;
  */
 public class ClamAVClient {
 
-  private String hostName;
-  private int port;
-  private int timeout;
+  private final String hostName;
+  private final int port;
+  private final int readTimeout;
+  private final int connectTimeout;
 
   // "do not exceed StreamMaxLength as defined in clamd.conf, otherwise clamd will reply with INSTREAM size limit exceeded and close the connection."
   private static final int CHUNK_SIZE = 2048;
-  private static final int DEFAULT_TIMEOUT = 500;
+  private static final int DEFAULT_READ_TIMEOUT = 500;
+  private static final int DEFAULT_CONNECT_TIMEOUT = 500;
   private static final int PONG_REPLY_LEN = 4;
 
   /**
    * @param hostName The hostname of the server running clamav-daemon
    * @param port     The port that clamav-daemon listens to(By default it might not listen to a port. Check your clamav configuration).
-   * @param timeout  zero means infinite timeout. Not a good idea, but will be accepted.
+   * @param readTimeout  zero means infinite read timeout. Not a good idea, but will be accepted.
+   * @param connectTimeout  zero means infinite connect timeout. Not a good idea, but will be accepted.
    */
-  public ClamAVClient(String hostName, int port, int timeout) {
-    if (timeout < 0) {
+  public ClamAVClient(String hostName, int port, int readTimeout, int connectTimeout) {
+    if (readTimeout < 0 || connectTimeout < 0) {
       throw new IllegalArgumentException("Negative timeout value does not make sense.");
     }
     this.hostName = hostName;
     this.port = port;
-    this.timeout = timeout;
+    this.readTimeout = readTimeout;
+    this.connectTimeout = connectTimeout;
+  }
+
+  /**
+   * @param hostName The hostname of the server running clamav-daemon
+   * @param port     The port that clamav-daemon listens to(By default it might not listen to a port. Check your clamav configuration).
+   * @param readTimeout  zero means infinite read timeout. Not a good idea, but will be accepted.
+   */
+  public ClamAVClient(String hostName, int port, int readTimeout) {
+    this(hostName, port, readTimeout, DEFAULT_CONNECT_TIMEOUT);
   }
 
   public ClamAVClient(String hostName, int port) {
-    this(hostName, port, DEFAULT_TIMEOUT);
+    this(hostName, port, DEFAULT_READ_TIMEOUT);
   }
 
   /**
@@ -44,8 +58,9 @@ public class ClamAVClient {
    * @return true if the server responded with proper ping reply.
    */
   public boolean ping() throws IOException {
-    try (Socket s = new Socket(hostName, port); OutputStream outs = s.getOutputStream()) {
-      s.setSoTimeout(timeout);
+    try (Socket s = openSocket();
+         OutputStream outs = s.getOutputStream()) {
+
       outs.write(asBytes("zPING\0"));
       outs.flush();
       byte[] b = new byte[PONG_REPLY_LEN];
@@ -72,8 +87,8 @@ public class ClamAVClient {
    * @return server reply
    */
   public byte[] scan(InputStream is) throws IOException {
-    try (Socket s = new Socket(hostName, port); OutputStream outs = new BufferedOutputStream(s.getOutputStream())) {
-      s.setSoTimeout(timeout);
+    try (Socket s = openSocket();
+         OutputStream outs = new BufferedOutputStream(s.getOutputStream())) {
 
       // handshake
       outs.write(asBytes("zINSTREAM\0"));
@@ -116,6 +131,13 @@ public class ClamAVClient {
   public byte[] scan(byte[] in) throws IOException {
     ByteArrayInputStream bis = new ByteArrayInputStream(in);
     return scan(bis);
+  }
+
+  protected Socket openSocket() throws IOException {
+    Socket socket = new Socket();
+    socket.connect(new InetSocketAddress(hostName, port), connectTimeout);
+    socket.setSoTimeout(readTimeout);
+    return socket;
   }
 
   /**
