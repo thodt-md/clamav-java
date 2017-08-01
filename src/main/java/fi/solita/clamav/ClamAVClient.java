@@ -93,7 +93,7 @@ public class ClamAVClient {
           if (clamIs.available() > 0) {
             // reply from server before scan command has been terminated.
             byte[] reply = assertSizeLimit(readAll(clamIs));
-            throw new IOException("Scan aborted. Reply from server: " + new String(reply, StandardCharsets.US_ASCII));
+            throw new IOException("Scan aborted. Reply from server: " + asText(reply));
           }
           read = is.read(chunk);
         }
@@ -125,16 +125,21 @@ public class ClamAVClient {
    * @return true if no virus was found according to the clamd reply message
    */
   public static boolean isCleanReply(byte[] reply) {
-    String r = new String(reply, StandardCharsets.US_ASCII);
+    String r = asText(reply);
     return (r.contains("OK") && !r.contains("FOUND"));
   }
 
 
-  private byte[] assertSizeLimit(byte[] reply) {
-    String r = new String(reply, StandardCharsets.US_ASCII);
+  private static byte[] assertSizeLimit(byte[] reply) {
+    String r = asText(reply);
     if (r.startsWith("INSTREAM size limit exceeded."))
       throw new ClamAVSizeLimitException("Clamd size limit exceeded. Full reply from server: " + r);
     return reply;
+  }
+
+  // construct an ASCII string from an array of bytes
+  private static String asText(byte[] reply) {
+    return new String(reply, StandardCharsets.US_ASCII);
   }
 
   // byte conversion based on ASCII character set regardless of the current system locale
@@ -147,7 +152,7 @@ public class ClamAVClient {
     ByteArrayOutputStream tmp = new ByteArrayOutputStream();
 
     byte[] buf = new byte[2000];
-    int read = 0;
+    int read;
     do {
       read = is.read(buf);
       tmp.write(buf, 0, read);
