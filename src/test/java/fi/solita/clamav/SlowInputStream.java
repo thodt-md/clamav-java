@@ -9,7 +9,7 @@ import java.util.Random;
  */
 public class SlowInputStream extends InputStream {
 
-  private static long SLOW_BYTE = 1000;
+  private static final long SLOW_BYTE = 1000;
   private long bytesAvail = 60000;
   private Random r = new Random();
 

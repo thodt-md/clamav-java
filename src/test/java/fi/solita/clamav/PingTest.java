@@ -1,9 +1,9 @@
 package fi.solita.clamav;
 
+import org.junit.ClassRule;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.net.UnknownHostException;
 
 import static org.junit.Assert.assertTrue;
 
@@ -12,9 +12,13 @@ import static org.junit.Assert.assertTrue;
  */
 public class PingTest {
 
+  @ClassRule
+  public static ClamdContainer container = new ClamdContainer();
+
   @Test
-  public void testPingPong() throws UnknownHostException, IOException {
-    ClamAVClient cl = new ClamAVClient("localhost", 3310);
+  public void testPingPong() throws IOException {
+    ClamAVClient cl = new ClamAVClient(container.getClamdHost(), container.getClamdPort());
     assertTrue(cl.ping());
   }
+
 }
