@@ -1,13 +1,7 @@
 package fi.solita.clamav;
 
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.Socket;
-import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -28,10 +22,10 @@ public class ClamAVClient {
 
   /**
    * @param hostName The hostname of the server running clamav-daemon
-   * @param port The port that clamav-daemon listens to(By default it might not listen to a port. Check your clamav configuration).
-   * @param timeout zero means infinite timeout. Not a good idea, but will be accepted.
+   * @param port     The port that clamav-daemon listens to(By default it might not listen to a port. Check your clamav configuration).
+   * @param timeout  zero means infinite timeout. Not a good idea, but will be accepted.
    */
-  public ClamAVClient(String hostName, int port, int timeout)  {
+  public ClamAVClient(String hostName, int port, int timeout) {
     if (timeout < 0) {
       throw new IllegalArgumentException("Negative timeout value does not make sense.");
     }
@@ -46,11 +40,11 @@ public class ClamAVClient {
 
   /**
    * Run PING command to clamd to test it is responding.
-   * 
+   *
    * @return true if the server responded with proper ping reply.
    */
   public boolean ping() throws IOException {
-    try (Socket s = new Socket(hostName,port); OutputStream outs = s.getOutputStream()) {
+    try (Socket s = new Socket(hostName, port); OutputStream outs = s.getOutputStream()) {
       s.setSoTimeout(timeout);
       outs.write(asBytes("zPING\0"));
       outs.flush();
@@ -72,15 +66,15 @@ public class ClamAVClient {
    * Since the parameter InputStream is not reset, you can not use the stream afterwards, as it will be left in a EOF-state.
    * If your goal is to scan some data, and then pass that data further, consider using {@link #scan(byte[]) scan(byte[] in)}.
    * <p>
-   * Opens a socket and reads the reply. Parameter input stream is NOT closed. 
-   * 
+   * Opens a socket and reads the reply. Parameter input stream is NOT closed.
+   *
    * @param is data to scan. Not closed by this method!
    * @return server reply
    */
   public byte[] scan(InputStream is) throws IOException {
-    try (Socket s = new Socket(hostName,port); OutputStream outs = new BufferedOutputStream(s.getOutputStream())) {
-      s.setSoTimeout(timeout); 
-      
+    try (Socket s = new Socket(hostName, port); OutputStream outs = new BufferedOutputStream(s.getOutputStream())) {
+      s.setSoTimeout(timeout);
+
       // handshake
       outs.write(asBytes("zINSTREAM\0"));
       outs.flush();
@@ -97,7 +91,7 @@ public class ClamAVClient {
           outs.write(chunkSize);
           outs.write(chunk, 0, read);
           if (clamIs.available() > 0) {
-            // reply from server before scan command has been terminated. 
+            // reply from server before scan command has been terminated.
             byte[] reply = assertSizeLimit(readAll(clamIs));
             throw new IOException("Scan aborted. Reply from server: " + new String(reply, StandardCharsets.US_ASCII));
           }
@@ -105,17 +99,17 @@ public class ClamAVClient {
         }
 
         // terminate scan
-        outs.write(new byte[]{0,0,0,0});
+        outs.write(new byte[]{0, 0, 0, 0});
         outs.flush();
         // read reply
         return assertSizeLimit(readAll(clamIs));
       }
-    } 
+    }
   }
 
   /**
    * Scans bytes for virus by passing the bytes to clamav
-   * 
+   *
    * @param in data to scan
    * @return server reply
    **/
@@ -134,12 +128,12 @@ public class ClamAVClient {
     String r = new String(reply, StandardCharsets.US_ASCII);
     return (r.contains("OK") && !r.contains("FOUND"));
   }
-  
+
 
   private byte[] assertSizeLimit(byte[] reply) {
     String r = new String(reply, StandardCharsets.US_ASCII);
-    if (r.startsWith("INSTREAM size limit exceeded.")) 
-    	throw new ClamAVSizeLimitException("Clamd size limit exceeded. Full reply from server: " + r);
+    if (r.startsWith("INSTREAM size limit exceeded."))
+      throw new ClamAVSizeLimitException("Clamd size limit exceeded. Full reply from server: " + r);
     return reply;
   }
 
